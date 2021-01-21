@@ -126,16 +126,22 @@ func (b *Bmumble) extractFiles(msg *config.Message) []config.Message {
 			}
 			continue
 		}
-		mimeType = strings.TrimSpace(strings.Split(mimeType, ";")[0])
-		// Build data:image/...;base64,... style image URL and embed image directly into the message
-		du := dataurl.New(*fi.Data, mimeType)
-		dataURL, err := du.MarshalText()
-		if err != nil {
-			b.Log.WithError(err).Infof("Image Serialization into data URL failed (type: %s, length: %d)", mimeType, len(*fi.Data))
-			continue
+		// Send image by embedding hosted image if available otherwise build dataURL
+		if len(fi.URL) > 0 {
+			imsg.Text = fmt.Sprintf(`<img src="%s"/>`, fi.URL)
+			messages = append(messages, imsg)
+		} else {
+			mimeType = strings.TrimSpace(strings.Split(mimeType, ";")[0])
+			// Build data:image/...;base64,... style image URL and embed image directly into the message
+			du := dataurl.New(*fi.Data, mimeType)
+			dataURL, err := du.MarshalText()
+			if err != nil {
+				b.Log.WithError(err).Infof("Image Serialization into data URL failed (type: %s, length: %d)", mimeType, len(*fi.Data))
+				continue
+			}
+			imsg.Text = fmt.Sprintf(`<img src="%s"/>`, dataURL)
+			messages = append(messages, imsg)
 		}
-		imsg.Text = fmt.Sprintf(`<img src="%s"/>`, dataURL)
-		messages = append(messages, imsg)
 	}
 	// Remove files from original message
 	msg.Extra["file"] = nil
